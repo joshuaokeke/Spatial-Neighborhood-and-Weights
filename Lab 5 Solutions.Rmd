@@ -1,0 +1,469 @@
+---
+title: "*Spatial Statistics Lab 5*"
+author: '**Onyedikachi J Okeke**'
+date: "`r Sys.Date()`"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### **0.0 To Load the library**
+```{r,comment="",echo=TRUE,eval=FALSE}
+library(sp)
+library(spatstat)
+library(sf)
+library(spatstat.geom)
+library(ctv)
+library(terra)
+library(spdep)
+
+```
+##### Library 
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+library(sp)
+library(spatstat)
+library(sf)
+library(spatstat.geom)
+library(ctv)
+library(terra)
+library(spdep)
+```
+### **Q1 Loading Sids data**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Define the file path
+file_path <- "C:/Spatial Statistics Labwork/Lab5Data/sids2.shp"
+
+# Import the shapefile
+sids <- st_read(file_path)
+
+class(sids)
+
+# Check the structure of the imported object
+str(sids)
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Define the file path
+file_path <- "C:/Spatial Statistics Labwork/Lab5Data/sids2.shp"
+
+# Import the shapefile
+sids <- st_read(file_path)
+
+class(sids)
+
+# Check the structure of the imported object
+str(sids)
+
+```
+
+### **Check the projection of the shapefile**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Extract CRS information using st_crs()
+crs_info <- st_crs(sids)
+
+# Print CRS information
+print(crs_info)
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Extract CRS information using st_crs()
+crs_info <- st_crs(sids)
+
+# Print CRS information
+print(crs_info)
+
+```
+
+### **Define the target CRS (NAD27 UTM Zone 17N**
+```{r,comment="",echo=TRUE,eval=FALSE}
+
+# Assign the coordinate system (WGS84)
+st_crs(sids) <- st_crs("+proj=longlat +ellps=WGS84")
+
+# Check the current CRS
+print(st_crs(sids))
+
+# Define the target CRS (NAD27 UTM Zone 17N)
+target_crs <- "+proj=utm +zone=17 +datum=NAD27"
+
+# Project the shapefile to the target CRS
+sids_projected <- st_transform(sids, target_crs)
+
+# Check the CRS of the projected shapefile
+print(st_crs(sids_projected))
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+
+# Assign the coordinate system (WGS84)
+st_crs(sids) <- st_crs("+proj=longlat +ellps=WGS84")
+
+# Check the current CRS
+print(st_crs(sids))
+
+# Define the target CRS (NAD27 UTM Zone 17N)
+target_crs <- "+proj=utm +zone=17 +datum=NAD27"
+
+# Project the shapefile to the target CRS
+sids_NAD <- st_transform(sids, target_crs)
+
+# Check the CRS of the projected shapefile
+print(st_crs(sids_NAD))
+
+```
+
+### **Define the CRS for North Carolina NAD 83 State Plane**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Define the CRS for North Carolina NAD 83 State Plane
+nc_crs <- st_crs("+proj=lcc +lat_1=34.33333333333334 +lat_2=36.16666666666666 +lat_0=33.75 +lon_0=-79 +x_0=609601.22 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
+
+# Transform the sids shapefile to North Carolina NAD 83 State Plane
+sids_SP <- st_transform(sids, nc_crs)
+print(st_crs(sids_SP))
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Define the CRS for North Carolina NAD 83 State Plane
+nc_crs <- st_crs("+proj=lcc +lat_1=34.33333333333334 +lat_2=36.16666666666666 +lat_0=33.75 +lon_0=-79 +x_0=609601.22 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
+
+# Transform the sids shapefile to North Carolina NAD 83 State Plane
+sids_SP <- st_transform(sids, nc_crs)
+print(st_crs(sids_SP))
+
+```
+
+### **Plotting the data in three different coordinate systems**
+```{r,comment="",echo=TRUE,eval=FALSE}
+par(mfrow=c(2,2))
+
+plot(sids, axes=T)
+title("WGS84")
+
+plot(sids_NAD, axes = TRUE)
+title("NAD27")
+
+plot(sids_SP, axes=T)
+title("NC State Plane")
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+par(mfrow=c(2,2))
+
+plot(sids, axes=T)
+title("WGS84")
+
+plot(sids_NAD, axes = TRUE)
+title("NAD27")
+
+plot(sids_SP, axes=T)
+title("NC State Plane")
+
+```
+
+### **Contiguity based neighbors**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Create Queen contiguity spatial weights matrix
+sids_nbq <- poly2nb(sids, queen = TRUE)
+# Check the summary of the spatial weights matrix
+summary(sids_nbq)
+
+# Create Queen (false) contiguity spatial weights matrix
+sids_nbr <- poly2nb(sids, queen = FALSE)
+# Check the summary of the spatial weights matrix
+summary(sids_nbr)
+
+plot(st_geometry(sids), main="Spatial Plot with Neighborhoods")
+
+coords <- st_coordinates(sids)
+
+# Check the number of neighborhoods in sids_nbq
+num_neighborhoods <- length(sids_nbq)
+
+# Check the number of coordinate pairs in coords
+num_coords <- nrow(coords)
+
+# Print out the counts for verification
+print(paste("Number of neighborhoods:", num_neighborhoods))
+print(paste("Number of coordinate pairs:", num_coords))
+
+# Example adjustment (assuming you need to align coords_2d with sids_nbq correctly)
+coords_2d_corrected <- coords[1:num_neighborhoods, ]
+
+par(mfrow=c(1,1))
+
+plot(sids_nbq, coords_2d_corrected)
+plot(sids, add= TRUE)
+
+plot(sids_nbr, coords_2d_corrected)
+plot(sids, add= TRUE)
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Create Queen contiguity spatial weights matrix
+sids_nbq <- poly2nb(sids, queen = TRUE)
+# Check the summary of the spatial weights matrix
+summary(sids_nbq)
+
+# Create Queen (false) contiguity spatial weights matrix
+sids_nbr <- poly2nb(sids, queen = FALSE)
+# Check the summary of the spatial weights matrix
+summary(sids_nbr)
+
+plot(st_geometry(sids), main="Spatial Plot with Neighborhoods")
+
+coords <- st_coordinates(sids)
+
+# Check the number of neighborhoods in sids_nbq
+num_neighborhoods <- length(sids_nbq)
+
+# Check the number of coordinate pairs in coords
+num_coords <- nrow(coords)
+
+# Print out the counts for verification
+print(paste("Number of neighborhoods:", num_neighborhoods))
+print(paste("Number of coordinate pairs:", num_coords))
+
+# Example adjustment (assuming you need to align coords_2d with sids_nbq correctly)
+coords_2d_corrected <- coords[1:num_neighborhoods, ]
+
+par(mfrow=c(1,1))
+
+plot(sids_nbq, coords_2d_corrected)
+plot(sids, add= TRUE)
+
+plot(sids_nbr, coords_2d_corrected)
+plot(sids, add= TRUE)
+
+
+```
+Q2
+
+### **Q3 Plot the ROOK case**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Get coordinates from spatial data
+coords <- st_coordinates(sids_SP) 
+
+# Assuming the first two columns are latitude and longitude
+coords_2d <- coords[, 1:2]
+
+# Then, re-run the knn2nb process with the adjusted 2D coordinates
+sids_kn1 <- knn2nb(knearneigh(coords_2d, k=1))
+sids_kn2 <- knn2nb(knearneigh(coords_2d, k=2))
+sids_kn4 <- knn2nb(knearneigh(coords_2d, k=4))
+
+# Plot
+plot(sids_SP, main = "SIDS Spatial Points")
+plot(sids_kn1, coords, add = TRUE, col = "red")
+plot(sids_kn2, coords, add = TRUE, col = "blue")
+plot(sids_kn4, coords, add = TRUE, col = "green")
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Get coordinates from spatial data
+coords <- st_coordinates(sids_SP) 
+
+# Assuming the first two columns are latitude and longitude
+coords_2d <- coords[, 1:2]
+
+# Then, re-run the knn2nb process with the adjusted 2D coordinates
+sids_kn1 <- knn2nb(knearneigh(coords_2d, k=1))
+sids_kn2 <- knn2nb(knearneigh(coords_2d, k=2))
+sids_kn4 <- knn2nb(knearneigh(coords_2d, k=4))
+
+# Plot
+plot(sids_SP, main = "SIDS Spatial Points")
+plot(sids_kn1, coords, add = TRUE, col = "red")
+plot(sids_kn2, coords, add = TRUE, col = "blue")
+plot(sids_kn4, coords, add = TRUE, col = "green")
+
+
+```
+
+Q4.briefly describe their differences
+
+### **Assign neighbors based on a specified distance**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Calculate distances
+dist <- unlist(nbdists(sids_kn1, coords_2d))
+summary(dist)  # Summarize distances to understand distribution
+max_k1 <- max(dist)  # Find the maximum distance
+
+# Create distance-based neighborhoods
+sids_kd1 <- dnearneigh(coords_2d, d1=0, d2=0.75*max_k1)
+sids_kd2 <- dnearneigh(coords_2d, d1=0, d2=1*max_k1)
+sids_kd3 <- dnearneigh(coords_2d, d1=0, d2=1.5*max_k1)
+
+# Set up the plotting area to have 3 rows for the different distance thresholds
+par(mfrow=c(3,1))
+
+# Plot for dist=0.75*max_k1
+plot(st_geometry(sids_SP), main="dist=0.75*max_k1")  # Plot the spatial object
+plot(sids_kd1, coords, add=TRUE)  # Add the dnearneigh plot
+
+# Plot for dist=1*max_k1
+plot(st_geometry(sids_SP), main="dist=1*max_k1")  # Plot the spatial object again for a new comparison
+plot(sids_kd2, coords, add=TRUE)  # Add the dnearneigh plot
+
+# Plot for dist=1.5*max_k1
+plot(st_geometry(sids_SP), main="dist=1.5*max_k1")  # Plot the spatial object again for another new comparison
+plot(sids_kd3, coords, add=TRUE)  # Add the dnearneigh plot
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Calculate distances
+dist <- unlist(nbdists(sids_kn1, coords_2d))
+summary(dist)  # Summarize distances to understand distribution
+max_k1 <- max(dist)  # Find the maximum distance
+
+# Create distance-based neighborhoods
+sids_kd1 <- dnearneigh(coords_2d, d1=0, d2=0.75*max_k1)
+sids_kd2 <- dnearneigh(coords_2d, d1=0, d2=1*max_k1)
+sids_kd3 <- dnearneigh(coords_2d, d1=0, d2=1.5*max_k1)
+
+# Set up the plotting area to have 3 rows for the different distance thresholds
+par(mfrow=c(1,1))
+
+# Plot for dist=0.75*max_k1
+plot(st_geometry(sids_SP), main="dist=0.75*max_k1")  # Plot the spatial object
+plot(sids_kd1, coords, add=TRUE)  # Add the dnearneigh plot
+
+# Plot for dist=1*max_k1
+plot(st_geometry(sids_SP), main="dist=1*max_k1")  # Plot the spatial object again for a new comparison
+plot(sids_kd2, coords, add=TRUE)  # Add the dnearneigh plot
+
+# Plot for dist=1.5*max_k1
+plot(st_geometry(sids_SP), main="dist=1.5*max_k1")  # Plot the spatial object again for another new comparison
+plot(sids_kd3, coords, add=TRUE)  # Add the dnearneigh plot
+
+```
+Q5. briefly describe their differences
+
+### **Row-standardized weights matrix**
+```{r,comment="",echo=TRUE,eval=FALSE}
+#Row-standardized weights matrix
+sids_nbq_w<- nb2listw(sids_nbq)
+print(sids_nbq_w)
+sids_nbq_w$neighbours[1:5]
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+#Row-standardized weights matrix
+sids_nbq_w<- nb2listw(sids_nbq)
+print(sids_nbq_w)
+sids_nbq_w$neighbours[1:5]
+
+```
+
+Q6. Define neighbors based on a specified distance (the mean distance of neighbors). Take a screen shot of your plot and briefly describe their differences
+
+### **Sids_nbq weights matrixs**
+```{r,comment="",echo=TRUE,eval=FALSE}
+#Row-standardized weights matrix
+sids_nbq_w$weights[1:5]
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+#Row-standardized weights matrix
+sids_nbq_w$weights[1:5]
+```
+
+Q7. What is the result? What does this mean?
+
+
+Q8. What is the result? What does this mean?
+
+### **Binary Weights**
+```{r,comment="",echo=TRUE,eval=FALSE}
+sids_nbq_wb<-nb2listw(sids_nbq, style="B")
+print(sids_nbq_wb)
+sids_nbq_wb$weights[1:5]
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+sids_nbq_wb<-nb2listw(sids_nbq, style="B")
+print(sids_nbq_wb)
+sids_nbq_wb$weights[1:5]
+```
+
+Q9. What is the result? What does this mean?
+
+### **Inverse distance weighting bases weights on the distance between centroids**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Extract coordinates from the 'sf' object
+
+coords_2d <- st_coordinates(sids_SP)[,1:2]
+
+sids_nbq <- knn2nb(knearneigh(coords_2d, k=2)) 
+dist <- nbdists(sids_nbq, coords_2d)
+
+# Adjusting IDW calculation to handle distances of 0
+idw <- lapply(dist, function(x) ifelse(x == 0, Inf, 1/(x/1000)))
+
+# Creating a spatial weights object with the IDW values
+sids_nbq_idwb <- nb2listw(sids_nbq, glist=idw, style="B")
+
+# Accessing initial weights and providing summary
+initial_weights <- sids_nbq_idwb$weights[1:5] # Get the first 5 weights
+print(initial_weights)
+
+# Summary of all weights
+weights_summary <- summary(unlist(sids_nbq_idwb$weights))
+print(weights_summary)
+
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Extract coordinates from the 'sf' object
+
+coords_2d <- st_coordinates(sids_SP)[,1:2]
+
+sids_nbq <- knn2nb(knearneigh(coords_2d, k=2)) 
+dist <- nbdists(sids_nbq, coords_2d)
+
+# Adjusting IDW calculation to handle distances of 0
+idw <- lapply(dist, function(x) ifelse(x == 0, Inf, 1/(x/1000)))
+
+# Creating a spatial weights object with the IDW values
+sids_nbq_idwb <- nb2listw(sids_nbq, glist=idw, style="B")
+
+# Accessing initial weights and providing summary
+initial_weights <- sids_nbq_idwb$weights[1:5] # Get the first 5 weights
+print(initial_weights)
+
+# Summary of all weights
+weights_summary <- summary(unlist(sids_nbq_idwb$weights))
+print(weights_summary)
+```
+
+Q10. What is the result? What does this mean?
+
+### **Sids_nbq weights matrixs**
+```{r,comment="",echo=TRUE,eval=FALSE}
+# Summary of all weights
+weights_summary <- summary(unlist(sids_nbq_idwb$weights))
+print(weights_summary)
+sids_nbq_w <- nb2listw(sids_nbq, zero.policy = T)
+print(sids_nbq_w)
+```
+##### Result
+```{r,echo=F,results='Show', fig.show='hold',eval=T}
+# Summary of all weights
+weights_summary <- summary(unlist(sids_nbq_idwb$weights))
+print(weights_summary)
+sids_nbq_w <- nb2listw(sids_nbq, zero.policy = T)
+print(sids_nbq_w)
+```
